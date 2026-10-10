@@ -4,23 +4,53 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { LOG_LEVEL_ENV, SERVER_NAME, SERVER_VERSION, SINGLE_HOST_ENV } from "@/_defs";
 import { $logger } from "@/_libs";
 import type { WslHostProfile } from "@/_types";
-import { WslHost, probeDistroFacts, queryDistroListing } from "@/modules/wsl";
-import { formatDistroStatus } from "@/modules/tools";
+import { runDistroCheck, runSetupCommand } from "@/modules/manage";
 import { createWslMcpServer } from "@/server";
 
 /** `@akms/mcp-ssh`'s guard logs through its own logger; keep the two thresholds aligned. */
 const SSH_LOG_LEVEL_ENV = "SSH_MCP_LOG_LEVEL";
 
+/**
+ * First arguments that open the distro manager. `config` is what `@akms/mcp-ssh` called it
+ * before 0.1.3 and still accepts; without the alias, a habit carried over from the sibling
+ * would fall through to starting the MCP server, which then sits waiting on stdin with no
+ * explanation.
+ */
+const SETUP_COMMAND_NAMES = ["setup", "config"];
+
 interface CliArguments {
     showHelp: boolean;
     showVersion: boolean;
     checkOnly: boolean;
+    /** `setup` as the first argument opens the distro manager instead of the server. */
+    setupMode: boolean;
+    /** `--target <id>` — the client `setup` opens on. */
+    targetId?: string;
 }
 
 function parseArguments(argv: string[]): CliArguments {
-    const parsed: CliArguments = { showHelp: false, showVersion: false, checkOnly: false };
+    const parsed: CliArguments = { showHelp: false, showVersion: false, checkOnly: false, setupMode: false };
 
-    for (const argument of argv) {
+    let rest = argv;
+    if (argv[0] != null && SETUP_COMMAND_NAMES.includes(argv[0]) == true) {
+        parsed.setupMode = true;
+        rest = argv.slice(1);
+    }
+
+    for (let index = 0; index < rest.length; index += 1) {
+        const argument = rest[index];
+
+        if (argument === "--target") {
+            parsed.targetId = rest[index + 1];
+            index += 1;
+            continue;
+        }
+
+        if (argument.startsWith("--target=") == true) {
+            parsed.targetId = argument.slice("--target=".length);
+            continue;
+        }
+
         if (argument === "--help" || argument === "-h") {
             parsed.showHelp = true;
             continue;
@@ -45,9 +75,17 @@ const HELP_TEXT = [
     "",
     "Usage:",
     "  akms-mcp-wsl [--check]",
+    "  akms-mcp-wsl setup [--target <client>]",
+    "",
+    "Commands:",
+    "  setup                Manage the WSL distros registered in an MCP client's config —",
+    "                       list, add, edit, remove, check, print. Asks plain questions,",
+    "                       so the WSL_* names below never have to be typed.",
     "",
     "Options:",
     "      --check          Look up the configured distro, run 'id' in it, report the result, and exit.",
+    "      --target <id>    setup: claude-code | codex | claude-desktop | cursor",
+    "                       (default: the first one installed)",
     "  -v, --version        Print the version and exit",
     "  -h, --help           Print this help and exit",
     "",
@@ -70,71 +108,24 @@ const HELP_TEXT = [
 ].join("\n");
 
 /**
- * Looks the distro up, runs `id` in it, and reports what happened.
- *
- * Without this the only way to find out whether the setup works is to ask an agent to try
- * something, which mixes a setup mistake up with a policy rejection. Writes to stdout
+ * `--check`: looks the configured distro up and runs `id` in it. The report itself is
+ * shared with `setup`, so a distro that passes setup passes `--check`. Writes to stdout
  * because this mode is not an MCP session.
  *
  * @returns Process exit code: 0 when the distro answers.
  */
-async function runDistroCheck(profile: WslHostProfile | null): Promise<number> {
+async function runCheckCommand(profile: WslHostProfile | null): Promise<number> {
     if (profile == null) {
-        process.stdout.write(`No WSL distro is registered — set ${SINGLE_HOST_ENV.DISTRO} (and optionally ${SINGLE_HOST_ENV.USER}).\n`);
+        process.stdout.write(`No WSL distro is registered — set ${SINGLE_HOST_ENV.DISTRO} (and optionally ${SINGLE_HOST_ENV.USER}), or run: akms-mcp-wsl setup\n`);
         return 1;
     }
 
-    const endpoint = `${profile.username ?? "(distro default)"}@${profile.distro}`;
-    process.stdout.write(`Checking ${profile.name}  →  ${endpoint}\n\n`);
-
-    let listing;
-    try {
-        listing = await queryDistroListing(profile.distro);
-    }
-    catch (ex) {
-        let detail = String(ex);
-        if (ex instanceof Error) {
-            detail = ex.message;
-        }
-        process.stdout.write(`  FAILED  wsl.exe could not be started: ${detail}\n`);
-        return 1;
-    }
-
-    if (listing.installed == false) {
-        process.stdout.write(`  FAILED  ${formatDistroStatus(listing)}\n`);
-        return 1;
-    }
-
-    const host = new WslHost(profile);
-    const startedAt = Date.now();
-
-    try {
-        const probe = await host.exec({
-            command: "id",
-            timeoutMs: profile.policy.execTimeoutMs,
-            maxOutputCharacters: profile.policy.maxOutputCharacters,
-            trackCwd: false,
-        });
-        const durationMs = Date.now() - startedAt;
-
-        if (probe.exitCode !== 0) {
-            process.stdout.write(`  FAILED  ${endpoint}  exit code ${probe.exitCode}\n          ${probe.stderr.trim()}\n`);
-            return 1;
-        }
-
-        const facts = await probeDistroFacts(host);
-        process.stdout.write(`  OK      ${probe.stdout.trim()}  (${durationMs}ms)\n`);
-        process.stdout.write(`          ${formatDistroStatus({ ...listing, ...facts })}\n`);
+    const answered = await runDistroCheck(profile, process.stdout);
+    if (answered == true) {
         return 0;
     }
-    catch (ex) {
-        let detail = String(ex);
-        if (ex instanceof Error) {
-            detail = ex.message;
-        }
-        process.stdout.write(`  FAILED  ${endpoint}\n          ${detail}\n`);
-        return 1;
-    }
+
+    return 1;
 }
 
 async function main(): Promise<void> {
@@ -152,9 +143,12 @@ async function main(): Promise<void> {
         return;
     }
 
-    // `--check` prints a report a person reads; interleaved log lines make it unreadable.
+    // `--check` prints a report a person reads, and `setup` is a terminal UI; interleaved
+    // log lines make the first unreadable and land in the middle of the second's prompts.
+    // Everything worth seeing — a missing distro, a rejected `id` — is in the report itself.
     // An explicit level still wins, so `WSL_MCP_LOG_LEVEL=debug --check` stays available.
-    if (cliArguments.checkOnly == true && process.env[LOG_LEVEL_ENV] == null) {
+    const printsForPerson = cliArguments.checkOnly == true || cliArguments.setupMode == true;
+    if (printsForPerson == true && process.env[LOG_LEVEL_ENV] == null) {
         process.env[LOG_LEVEL_ENV] = "silent";
     }
 
@@ -162,10 +156,19 @@ async function main(): Promise<void> {
         process.env[SSH_LOG_LEVEL_ENV] = process.env[LOG_LEVEL_ENV];
     }
 
+    if (cliArguments.setupMode == true) {
+        const exitCode = await runSetupCommand({
+            input: process.stdin,
+            output: process.stdout,
+            targetId: cliArguments.targetId,
+        });
+        process.exit(exitCode);
+    }
+
     const instance = createWslMcpServer();
 
     if (cliArguments.checkOnly == true) {
-        const exitCode = await runDistroCheck(instance.profile);
+        const exitCode = await runCheckCommand(instance.profile);
         instance.shutdown();
         process.exit(exitCode);
     }

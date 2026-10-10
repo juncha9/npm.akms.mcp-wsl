@@ -6,6 +6,7 @@ Sibling of [`@akms/mcp-ssh`](https://github.com/alkemic-studio/npm.akms.mcp-ssh)
 
 ```bash
 npm run dev -- --check   # tsx, straight from src
+npm run dev -- setup     # the distro manager, against this machine's real client configs
 npm run build            # tsc --noEmit → tsup (esm + cjs + dts into lib/)
 npm test                 # vitest, unit tests only
 MCP_WSL_TEST_DISTRO=ubuntu MCP_WSL_TEST_USER=root npm test   # + live tests against a real distro
@@ -21,10 +22,11 @@ src/
 ├── modules/
 │   ├── config/  WSL_* readers, profile builder
 │   ├── guard/   the WSL additions over @akms/mcp-ssh's guard
+│   ├── manage/  the `setup` command: prompts, settings form, per-client config writers
 │   ├── wsl/     wsl.exe process runner, session manager, file operations, distro status
 │   └── tools/   MCP tool registration, output formatting
 ├── server.ts    createWslMcpServer()
-├── cli.ts       bin entry (stdio transport, --check)
+├── cli.ts       bin entry (stdio transport, --check, setup)
 └── index.ts     library entry
 ```
 
@@ -66,6 +68,16 @@ The `/mnt` write rule judges the write **target**, not the mention: `cp /mnt/c/a
 
 Each call is its own process, so there is nothing to keep open. A session serializes its calls (the directory is read-modify-write) and adopts the `$PWD` the marker reports, after the same metacharacter check a caller-supplied `cwd` gets.
 
+### `setup` is mcp-ssh's manager with a WSL form
+
+`@akms/mcp-ssh` does not export its `setup` machinery, so the client-agnostic half is copied: `prompter.ts` (arrow-key lists and a raw-mode line editor on a TTY, so Esc is seen everywhere; numbered lists off one), `targets/` (Claude Code through `claude mcp`, Codex by TOML section rewrite, plain `mcpServers` JSON files) and the menu loop. Only the macOS / Linux branches were dropped — the package is win32-only, so every entry launches through `cmd /c npx`. A fix to one of those files almost certainly belongs in both packages.
+
+Written fresh: the settings form (`host-form.ts`) and the entry mapping. There is no connection, so the SSH settings (port, auth, route) and host-key pinning are gone, and so are the rows a choice brings with it — every WSL row is always shown. The distro is picked from `listDistros()` — the `wsl -l -v` rows, matched case-insensitively and written as wsl.exe spells it — and a typed name that is not listed needs an explicit yes. A new entry starts on the default distro, so Save alone writes a complete entry. `WSL_ALLOW_WINDOWS` starts locked, for the reason the server defaults it off.
+
+Esc inside a field returns to the form with the cursor on that row. mcp-ssh's form snapshots and restores its state around every pick, because a route choice opens a jump-host question after the route is already set; no WSL setting does that — every editor assigns only once its prompt is answered — so this form has no snapshot to restore. A setting that ever asks a follow-up after assigning needs one.
+
+The check is the server's own path: the entry about to be written goes through `loadHostProfile(env)` and the same `runDistroCheck` report `--check` prints, so a value the server would reject is caught before it is written. Running `id` starts a stopped distro, which is why the Test row and the Save prompt say so. Full rules and rationale are in [docs/design/setup-command.md](docs/design/setup-command.md).
+
 ## 🧪 Testing
 
 | File | Covers |
@@ -74,8 +86,13 @@ Each call is its own process, so there is nothing to keep open. A session serial
 | `host-profile.test.ts` | `WSL_*` mapping, defaults, malformed values |
 | `wsl-command.test.ts` | Argument vector (`--exec`), `cd` wrapper, cwd marker |
 | `live-integration.test.ts` | **MCP client ↔ server ↔ real distro** over an in-memory transport: exit codes, argument bytes, UTF-8, closed stdin, bad cwd, session `cd`, timeout, guard rejections proving nothing ran, file round-trips including binary upload/download, unknown distro |
+| `manage-entry.test.ts` | `setup` answers ⇄ entry, carried variables, the `loadHostProfile(env)` contract |
+| `manage-toml.test.ts` | Codex TOML: append, replace keeping hand-added keys, remove, CRLF |
+| `manage-command.test.ts` | **The `setup` UI end to end** — the menu and the settings form over scripted stdin, an injected distro list, a temp JSON config; the failing checks run the real `wsl -l -v` against a name that is not installed |
+| `manage-prompter.test.ts` | Arrow-key lists, the line editor, secret input and Esc as "back" on a simulated TTY; the numbered fallback off one |
+| `manage-cli-shim.test.ts` | Windows only — a JSON payload through npm's `.cmd` shim template, byte for byte |
 
-The live file is skipped unless `MCP_WSL_TEST_DISTRO` names an installed distro on a Windows machine. It creates and removes `/tmp/akms-mcp-wsl-test-<pid>` in that distro.
+The live file, and the one live case in `manage-command.test.ts`, are skipped unless `MCP_WSL_TEST_DISTRO` names an installed distro on a Windows machine. The live file creates and removes `/tmp/akms-mcp-wsl-test-<pid>` in that distro.
 
 ## 📚 Embedding as a library
 

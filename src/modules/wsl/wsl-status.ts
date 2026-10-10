@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 import { WSL_EXECUTABLE } from "@/_defs";
 import { $logger } from "@/_libs";
-import type { WslDistroStatus } from "@/_types";
+import type { WslDistroListing, WslDistroStatus } from "@/_types";
 
 import type { WslHost } from "./wsl-host";
 
@@ -12,17 +12,15 @@ const LISTING_TIMEOUT_MS = 10_000;
 const PROBE_CAPTURE_BYTES = 64 * 1024;
 
 /** One row of `wsl -l -v`: optional default marker, name, state, version. */
-const LISTING_ROW_PATTERN = /^\s*\*?\s*(.+?)\s+(Running|Stopped|Installing)\s+(\d)\s*$/;
+const LISTING_ROW_PATTERN = /^\s*(\*?)\s*(.+?)\s+(Running|Stopped|Installing)\s+(\d)\s*$/;
 
 /**
- * What `wsl.exe -l -v` says about the distro. Does not start it — that is what makes
- * this safe to call from `wsl_list_hosts` and `--check` without side effects.
+ * Every distro `wsl.exe -l -v` lists. Does not start any of them — that is what makes
+ * this safe to call from `wsl_list_hosts`, `--check` and the `setup` form.
  *
  * @throws {Error} If `wsl.exe` cannot be started at all.
  */
-export async function queryDistroListing(distro: string): Promise<WslDistroStatus> {
-    const _logger = $logger.child({ context: "queryDistroListing", distro: distro });
-
+export async function listDistros(): Promise<WslDistroListing[]> {
     const listing = await new Promise<string>((resolve, reject) => {
         const child = spawn(WSL_EXECUTABLE, ["-l", "-v"], {
             env: { ...process.env, WSL_UTF8: "1" },
@@ -49,25 +47,44 @@ export async function queryDistroListing(distro: string): Promise<WslDistroStatu
         });
     });
 
+    const distros: WslDistroListing[] = [];
     for (const line of listing.split(/\r?\n/)) {
         const match = LISTING_ROW_PATTERN.exec(line);
         if (match == null) {
             continue;
         }
 
-        if (match[1].toLowerCase() !== distro.toLowerCase()) {
-            continue;
-        }
-
-        return {
-            installed: true,
-            state: match[2] as WslDistroStatus["state"],
-            wslVersion: Number(match[3]),
-        };
+        distros.push({
+            name: match[2],
+            state: match[3] as WslDistroListing["state"],
+            wslVersion: Number(match[4]),
+            isDefault: match[1] === "*",
+        });
     }
 
-    _logger.warn("distro not present in wsl -l -v");
-    return { installed: false, state: "unknown" };
+    return distros;
+}
+
+/**
+ * What `wsl.exe -l -v` says about the distro. Does not start it.
+ *
+ * @throws {Error} If `wsl.exe` cannot be started at all.
+ */
+export async function queryDistroListing(distro: string): Promise<WslDistroStatus> {
+    const _logger = $logger.child({ context: "queryDistroListing", distro: distro });
+
+    const distros = await listDistros();
+    const listed = distros.find((candidate) => candidate.name.toLowerCase() === distro.toLowerCase());
+    if (listed == null) {
+        _logger.warn("distro not present in wsl -l -v");
+        return { installed: false, state: "unknown" };
+    }
+
+    return {
+        installed: true,
+        state: listed.state,
+        wslVersion: listed.wslVersion,
+    };
 }
 
 /**

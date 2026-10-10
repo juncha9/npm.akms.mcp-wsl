@@ -8,4 +8,4 @@ export { WslSession, WslSessionManager } from "./session-manager";
 export { listDirectory, readFile, writeFile, uploadFile, downloadFile } from "./file-operations";
 export type { DirectoryListing, FileContent } from "./file-operations";
 
-export { queryDistroListing, probeDistroFacts } from "./wsl-status";
+export { listDistros, queryDistroListing, probeDistroFacts } from "./wsl-status";

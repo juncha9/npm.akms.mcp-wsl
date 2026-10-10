@@ -15,6 +15,7 @@ export {
     writeFile,
     uploadFile,
     downloadFile,
+    listDistros,
     queryDistroListing,
     probeDistroFacts,
 } from "./modules/wsl";
@@ -37,6 +38,7 @@ export type {
     WslExecResult,
     WslSessionInfo,
     WslDirectoryEntry,
+    WslDistroListing,
     WslDistroStatus,
     GuardVerdict,
 } from "./_types";

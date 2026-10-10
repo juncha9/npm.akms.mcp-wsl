@@ -38,6 +38,15 @@ export interface WslDirectoryEntry {
     modifiedAt: string;
 }
 
+/** One row of `wsl.exe -l -v`. */
+export interface WslDistroListing {
+    name: string;
+    state: "Running" | "Stopped" | "Installing";
+    wslVersion: number;
+    /** The `*` row — what `wsl` with no `-d` would start. */
+    isDefault: boolean;
+}
+
 /** What `wsl.exe -l -v` and a probe inside the distro report — the facts infra-wsl reasoning needs. */
 export interface WslDistroStatus {
     /** False when `wsl -l -v` does not list the distro at all. */

@@ -13,6 +13,7 @@ export {
     WSL_FAILURE_EXIT_CODES,
     SERVER_NAME,
     SERVER_VERSION,
+    PACKAGE_NAME,
 } from "./defaults";
 
 export { SINGLE_HOST_ENV, TRUTHY_ENV_VALUES, FALSY_ENV_VALUES } from "./env-vars";

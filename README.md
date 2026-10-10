@@ -17,7 +17,55 @@ npx -y @akms/mcp-wsl --help    # or run it straight from the registry
 
 ## ⚙️ MCP client setup
 
-**One server entry per distro and user** — plain `WSL_*` variables, no config file. Claude Code reads `.mcp.json` in the project or `~/.claude.json` globally; Claude Desktop takes the same block inside `claude_desktop_config.json`:
+**Let the CLI write it.** `setup` opens a small manager for the distros registered in a client's config. No `WSL_*` name has to be remembered.
+
+```bash
+npx -y @akms/mcp-wsl setup                   # opens on the first client found on this machine
+npx -y @akms/mcp-wsl setup --target codex    # claude-code | codex | claude-desktop | cursor
+```
+
+```
+Claude Code (user scope)  C:\Users\me\.claude.json
+
+? 2 WSL entries — pick one to manage it
+❯ wsl_ubuntu_root    root@Ubuntu
+  wsl_ubuntu_deploy  deploy@Ubuntu  readonly, paths /var/log,/opt/app
+  ────────────────────────
+  Add a distro
+  Switch client  also found: Codex CLI
+  Quit
+↑↓ move · enter select · esc back
+```
+
+The entries are the menu: pick one to edit, check, print or remove it. Adding or editing opens a settings form — every setting listed with its value, picked and changed in any order, with **Test the distro** and **Save** below:
+
+```
+? New distro entry
+❯ Distro          Ubuntu
+  User            distro default  the Linux user commands run as
+  Server name     wsl_ubuntu      follows the distro and user until you change it
+  Description     none            shown to the agent
+  Read-only       no              enter toggles
+  Windows access  locked          enter toggles · .exe through interop, writes under /mnt/<drive>/
+  File paths      anywhere        where the file tools may read and write
+  ────────────────────────
+  Test the distro  runs 'id' as the user · starts a stopped distro
+  Save             to Claude Code (user scope)
+  Cancel
+```
+
+The distro is picked from what `wsl -l -v` lists, and a new entry starts on the default one. Test runs the same check as `--check`; Save offers it when the values changed since the last one. Esc always goes back one level — out of a field with the value unchanged, from the write preview back into the form. Where the terminal cannot send arrow keys (a pipe, Git Bash's mintty), the same lists are numbered and answered by number. `config`, the name `@akms/mcp-ssh` used before 0.1.3, opens the same manager.
+
+| Client | Config file | How it is written |
+|---|---|---|
+| Claude Code | `~/.claude.json` (user scope) | through `claude mcp add-json … -s user`, never by editing the file |
+| Codex | `~/.codex/config.toml` | only the `[mcp_servers.<name>]` tables are rewritten; keys you added to them stay |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | `mcpServers.<name>` is set, every other key kept |
+| Cursor | `~/.cursor/mcp.json` | same |
+
+Only entries that launch this package are listed or touched — `@akms/mcp-ssh` entries in the same file are left alone. An edit keeps every `WSL_*` variable the form does not show (`WSL_CWD`, `WSL_ALLOW_SUDO`, allow-lists, timeouts, …). **Print** shows an entry as JSON, as a Codex TOML table and as a `claude mcp add-json` line, for when pasting is easier. Entries launch through `cmd /c npx`, the form Claude Code expects for npx servers on Windows.
+
+**Or by hand — one server entry per distro and user** — plain `WSL_*` variables, no config file. Claude Code reads `.mcp.json` in the project or `~/.claude.json` globally; Claude Desktop takes the same block inside `claude_desktop_config.json`:
 
 ```json
 {

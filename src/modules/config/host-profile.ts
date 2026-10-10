@@ -10,8 +10,8 @@ import { $logger } from "@/_libs";
 import type { WslHostProfile, WslHostSummary, WslPolicy } from "@/_types";
 
 /** Trimmed value, or undefined when the variable is unset or blank. */
-function readEnv(name: string): string | undefined {
-    const value = process.env[name];
+function readEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
+    const value = env[name];
     if (value == null) {
         return undefined;
     }
@@ -28,8 +28,8 @@ function readEnv(name: string): string | undefined {
  * @throws {Error} If the value is set but is neither a truthy nor a falsy spelling —
  *                 `WSL_READONLY=ture` must fail loudly, not resolve to "not read-only".
  */
-function readBooleanEnv(name: string): boolean | undefined {
-    const value = readEnv(name);
+function readBooleanEnv(env: NodeJS.ProcessEnv, name: string): boolean | undefined {
+    const value = readEnv(env, name);
     if (value == null) {
         return undefined;
     }
@@ -49,8 +49,8 @@ function readBooleanEnv(name: string): boolean | undefined {
 /**
  * @throws {Error} If the value is set but is not a positive integer.
  */
-function readIntegerEnv(name: string): number | undefined {
-    const value = readEnv(name);
+function readIntegerEnv(env: NodeJS.ProcessEnv, name: string): number | undefined {
+    const value = readEnv(env, name);
     if (value == null) {
         return undefined;
     }
@@ -64,8 +64,8 @@ function readIntegerEnv(name: string): number | undefined {
 }
 
 /** Comma-separated list, blanks dropped. */
-function readListEnv(name: string): string[] | undefined {
-    const value = readEnv(name);
+function readListEnv(env: NodeJS.ProcessEnv, name: string): string[] | undefined {
+    const value = readEnv(env, name);
     if (value == null) {
         return undefined;
     }
@@ -115,12 +115,14 @@ function compileDenyPatterns(sources: string[]): RegExp[] {
  *  2) Resolve the policy over the built-in permissive stance; each variable is opt-in restriction
  *  3) Assemble the profile
  *
+ * @param env - Where the `WSL_*` variables are read from. Defaults to the process
+ *              environment; the `setup` command passes the entry it is about to write.
  * @throws {Error} If a typed value is malformed.
  */
-export function loadHostProfile(): WslHostProfile | null {
+export function loadHostProfile(env: NodeJS.ProcessEnv = process.env): WslHostProfile | null {
     // (1) Guard — a missing distro is not an error: the server reports "not configured"
     // through the tools, which is a far clearer signal to the model than a dead server.
-    const distro = readEnv(SINGLE_HOST_ENV.DISTRO);
+    const distro = readEnv(env, SINGLE_HOST_ENV.DISTRO);
     if (distro == null) {
         const _startupLogger = $logger.child({ context: "loadHostProfile" });
         _startupLogger.warn("no distro is registered; set the distro variable and restart", {
@@ -129,14 +131,14 @@ export function loadHostProfile(): WslHostProfile | null {
         return null;
     }
 
-    const name = readEnv(SINGLE_HOST_ENV.NAME) ?? distro;
+    const name = readEnv(env, SINGLE_HOST_ENV.NAME) ?? distro;
     const _logger = $logger.child({ context: "loadHostProfile", profile: name });
 
     // (2) Policy — the built-in stance is permissive: an unconfigured distro allows
     // everything except the catastrophe rules, because a guard nobody can work through
     // gets turned off wholesale rather than tuned. The one exception is Windows access,
     // which is opt-in — see `WslHostProfile.allowWindows`.
-    const allowCommands = readListEnv(SINGLE_HOST_ENV.ALLOW_COMMANDS) ?? [];
+    const allowCommands = readListEnv(env, SINGLE_HOST_ENV.ALLOW_COMMANDS) ?? [];
 
     // `wsl_connect` probes with `pwd` to settle the session's starting directory; without
     // this an allow-list profile could never open a session at all.
@@ -145,26 +147,26 @@ export function loadHostProfile(): WslHostProfile | null {
     }
 
     const policy: WslPolicy = {
-        readonly: readBooleanEnv(SINGLE_HOST_ENV.READONLY) ?? false,
-        allowSudo: readBooleanEnv(SINGLE_HOST_ENV.ALLOW_SUDO) ?? true,
-        execTimeoutMs: readIntegerEnv(SINGLE_HOST_ENV.EXEC_TIMEOUT_MS) ?? DEFAULT_EXEC_TIMEOUT_MS,
+        readonly: readBooleanEnv(env, SINGLE_HOST_ENV.READONLY) ?? false,
+        allowSudo: readBooleanEnv(env, SINGLE_HOST_ENV.ALLOW_SUDO) ?? true,
+        execTimeoutMs: readIntegerEnv(env, SINGLE_HOST_ENV.EXEC_TIMEOUT_MS) ?? DEFAULT_EXEC_TIMEOUT_MS,
         // Nothing connects; carried only because the shared policy type declares it.
         connectTimeoutMs: 0,
-        maxOutputCharacters: readIntegerEnv(SINGLE_HOST_ENV.MAX_OUTPUT_CHARACTERS) ?? DEFAULT_MAX_OUTPUT_CHARACTERS,
-        maxReadFileBytes: readIntegerEnv(SINGLE_HOST_ENV.MAX_READ_FILE_BYTES) ?? DEFAULT_MAX_READ_FILE_BYTES,
+        maxOutputCharacters: readIntegerEnv(env, SINGLE_HOST_ENV.MAX_OUTPUT_CHARACTERS) ?? DEFAULT_MAX_OUTPUT_CHARACTERS,
+        maxReadFileBytes: readIntegerEnv(env, SINGLE_HOST_ENV.MAX_READ_FILE_BYTES) ?? DEFAULT_MAX_READ_FILE_BYTES,
         allowCommands: allowCommands,
-        denyPatterns: compileDenyPatterns(readListEnv(SINGLE_HOST_ENV.DENY_PATTERNS) ?? []),
-        allowedPaths: readListEnv(SINGLE_HOST_ENV.ALLOWED_PATHS) ?? [],
+        denyPatterns: compileDenyPatterns(readListEnv(env, SINGLE_HOST_ENV.DENY_PATTERNS) ?? []),
+        allowedPaths: readListEnv(env, SINGLE_HOST_ENV.ALLOWED_PATHS) ?? [],
     };
 
     // (3) Profile
     const profile: WslHostProfile = {
         name: name,
         distro: distro,
-        username: readEnv(SINGLE_HOST_ENV.USER),
-        description: readEnv(SINGLE_HOST_ENV.DESCRIPTION),
-        defaultCwd: readEnv(SINGLE_HOST_ENV.CWD),
-        allowWindows: readBooleanEnv(SINGLE_HOST_ENV.ALLOW_WINDOWS) ?? false,
+        username: readEnv(env, SINGLE_HOST_ENV.USER),
+        description: readEnv(env, SINGLE_HOST_ENV.DESCRIPTION),
+        defaultCwd: readEnv(env, SINGLE_HOST_ENV.CWD),
+        allowWindows: readBooleanEnv(env, SINGLE_HOST_ENV.ALLOW_WINDOWS) ?? false,
         policy: policy,
     };
 
