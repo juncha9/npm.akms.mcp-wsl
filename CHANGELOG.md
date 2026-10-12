@@ -2,6 +2,17 @@
 
 All notable changes to `@akms/mcp-wsl`. Dates are `YYYY-MM-DD`.
 
+## 0.1.1 — 2026-10-13
+
+### Documentation
+
+- Align the manual MCP client examples with `setup` by launching through `cmd /c npx`
+  on Windows, and clarify the installation prerequisites.
+- Add PowerShell environment examples for `--check` and the live tests. Explain how to
+  check saved entries through `setup`, the `id` allow-list requirement, and check exit codes.
+- Expand the release procedure to include lockfile and server-version synchronization,
+  tests, build verification, CLI version output and a package preview before publishing.
+
 ## 0.1.0 — 2026-10-11
 
 ### Added

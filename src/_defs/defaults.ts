@@ -39,4 +39,4 @@ export const SERVER_NAME = "akms-mcp-wsl";
 /** What `npx -y …` resolves — the `args` the `setup` command writes into every entry. */
 export const PACKAGE_NAME = "@akms/mcp-wsl";
 
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.1.1";

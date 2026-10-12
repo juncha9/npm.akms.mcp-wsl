@@ -4,13 +4,17 @@ Sibling of [`@akms/mcp-ssh`](https://github.com/alkemic-studio/npm.akms.mcp-ssh)
 
 ## 🧑‍💻 Commands
 
-```bash
+Run from Windows PowerShell at the repository root:
+
+```powershell
+npm ci                   # install the locked dependencies
 npm run dev -- --check   # tsx, straight from src
 npm run dev -- setup     # the distro manager, against this machine's real client configs
 npm run build            # tsc --noEmit → tsup (esm + cjs + dts into lib/)
-npm test                 # vitest, unit tests only
-MCP_WSL_TEST_DISTRO=ubuntu MCP_WSL_TEST_USER=root npm test   # + live tests against a real distro
+npm test                 # vitest; live cases require MCP_WSL_TEST_DISTRO
 ```
+
+`--check` needs `WSL_DISTRO` (and optionally `WSL_USER`) in the current shell; see the [PowerShell example](README.md#check-it-before-wiring-it-up). The live-test variables below are separate from those server settings.
 
 ## 🗂️ Layout
 
@@ -94,6 +98,20 @@ The check is the server's own path: the entry about to be written goes through `
 
 The live file, and the one live case in `manage-command.test.ts`, are skipped unless `MCP_WSL_TEST_DISTRO` names an installed distro on a Windows machine. The live file creates and removes `/tmp/akms-mcp-wsl-test-<pid>` in that distro.
 
+To include them, choose a distro from `wsl -l -v` and an existing Linux user (`MCP_WSL_TEST_USER` defaults to `root`):
+
+```powershell
+$env:MCP_WSL_TEST_DISTRO = "Ubuntu"
+$env:MCP_WSL_TEST_USER = "root"
+npm test
+```
+
+Unset the variables when returning to the default test run:
+
+```powershell
+Remove-Item Env:MCP_WSL_TEST_DISTRO, Env:MCP_WSL_TEST_USER -ErrorAction SilentlyContinue
+```
+
 ## 📚 Embedding as a library
 
 ```typescript
@@ -108,4 +126,17 @@ instance.shutdown();
 
 ## 📦 Releasing
 
-Bump `version` in `package.json` and `SERVER_VERSION` in `src/_defs/defaults.ts` together, add the entry to `CHANGELOG.md`, then `npm run build && npm publish`.
+Keep `package.json`, both root-package versions in `package-lock.json`, and `SERVER_VERSION` in `src/_defs/defaults.ts` in sync. The constant is used by the CLI's `--version` output and the MCP server handshake.
+
+1. Run `npm version patch --no-git-tag-version` (or choose `minor` / `major`) to update the manifest and lockfile without creating a commit or tag.
+2. Set `SERVER_VERSION` to the same version and add a dated entry to `CHANGELOG.md`. Update the usage and development docs for the changes being released.
+3. Run each check below and confirm it succeeds before publishing. Include the live tests above when validating WSL behavior.
+
+```powershell
+npm test
+npm run build
+node ./lib/cli.js --version
+npm pack --dry-run
+```
+
+Check that the CLI prints the release version and the package preview contains the built `lib/` files, `README.md` and `LICENSE.md`. After reviewing the changes and package contents, publish with `npm publish`.
