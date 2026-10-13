@@ -91,7 +91,7 @@ Only entries that launch this package are listed or touched — `@akms/mcp-ssh` 
 
 `WSL_DISTRO` is the whole minimum (the name as `wsl -l -q` prints it). Because each server fronts one distro *as one user*, the agent never picks either: `wsl_exec({ command: "df -h" })` is a complete call, and root access is a matter of which entry exists — not of an argument. The server name is what the agent sees in its tool list, so put the user in it.
 
-The server speaks MCP over **stdio**: stdout carries the JSON-RPC stream and all logging goes to stderr.
+The server speaks MCP over **stdio**: stdout carries the JSON-RPC stream and all logging goes to stderr. When the client goes away — stdin ends, or the process is simply gone — the server exits within a few seconds on its own; a stderr nobody reads is never a reason to stay. Its log says `mcp server ready on stdio` with its `pid`, for when one has to be found among a client's processes.
 
 ## 🗂️ Distro configuration
 

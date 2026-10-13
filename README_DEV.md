@@ -82,6 +82,19 @@ Esc inside a field returns to the form with the cursor on that row. mcp-ssh's fo
 
 The check is the server's own path: the entry about to be written goes through `loadHostProfile(env)` and the same `runDistroCheck` report `--check` prints, so a value the server would reject is caught before it is written. Running `id` starts a stopped distro, which is why the Test row and the Save prompt say so. Full rules and rationale are in [docs/design/setup-command.md](docs/design/setup-command.md).
 
+### A dead stderr is never a reason to stay
+
+When the MCP client dies, every pipe the server holds dies with it. stdin's EOF starts the shutdown, and
+the first log line of that shutdown goes to a stderr nobody reads: on Windows the write fails
+asynchronously with EPIPE as an `'error'` event on `process.stderr`. The logger owns one listener for
+that event and drops every later line (`stderrBroken`), so the failure is never logged — logging it
+was the loop that kept `@akms/mcp-db` 0.1.1 behind at 100% CPU, measured 2026-10-13 under Claude
+Code's `cmd /c` launch. Here the exit used to win the race because `shutdown()` is synchronous; the
+guard removes the race, the `uncaughtException` handler keeps one session's stray error from ending the
+client's whole tool set, and `SHUTDOWN_DEADLINE_MS` (5 s) exits regardless of what the transport or a
+stuck `wsl.exe` still owes. `tests/cli-shutdown.test.ts` starts the server the way Claude Code does and
+expects it gone within 5 s of the client's death.
+
 ## 🧪 Testing
 
 | File | Covers |

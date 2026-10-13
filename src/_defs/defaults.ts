@@ -16,6 +16,9 @@ export const SESSION_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export const SESSION_SWEEP_INTERVAL_MS = 60_000;
 
+/** Shutdown waits this long for the sessions and the transport to close, then exits anyway — a stuck `wsl.exe` must not keep the process alive. */
+export const SHUTDOWN_DEADLINE_MS = 5_000;
+
 /** Ceiling on simultaneously running `wsl.exe` processes, so a runaway tool batch can't fork-bomb the host. */
 export const MAX_CONCURRENT_PROCESSES = 32;
 
@@ -39,4 +42,4 @@ export const SERVER_NAME = "akms-mcp-wsl";
 /** What `npx -y …` resolves — the `args` the `config` command writes into every entry. */
 export const PACKAGE_NAME = "@akms/mcp-wsl";
 
-export const SERVER_VERSION = "0.1.2";
+export const SERVER_VERSION = "0.1.3";
