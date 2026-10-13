@@ -116,7 +116,7 @@ function compileDenyPatterns(sources: string[]): RegExp[] {
  *  3) Assemble the profile
  *
  * @param env - Where the `WSL_*` variables are read from. Defaults to the process
- *              environment; the `setup` command passes the entry it is about to write.
+ *              environment; the `config` command passes the entry it is about to write.
  * @throws {Error} If a typed value is malformed.
  */
 export function loadHostProfile(env: NodeJS.ProcessEnv = process.env): WslHostProfile | null {

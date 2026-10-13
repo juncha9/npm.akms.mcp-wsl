@@ -15,7 +15,7 @@ export { runDistroCheck } from "./connection-check";
 /** Prefix of an entry row's select value, so an entry named like an action can't collide with it. */
 const HOST_VALUE_PREFIX = "host:";
 
-export interface SetupCommandOptions {
+export interface ConfigCommandOptions {
     input: Readable;
     output: Writable;
     /** Supported clients; tests pass their own so nothing under the real home is touched. */
@@ -225,13 +225,13 @@ async function manageHost(
 }
 
 /**
- * `akms-mcp-wsl setup` — an interactive manager for the WSL distros registered in an MCP
+ * `akms-mcp-wsl config` — an interactive manager for the WSL distros registered in an MCP
  * client's config. The entries themselves are the menu: pick one to edit, check, print or
  * remove it, or pick an action below them. The `WSL_*` names never have to be typed.
  *
  * @returns Process exit code.
  */
-export async function runSetupCommand(options: SetupCommandOptions): Promise<number> {
+export async function runConfigCommand(options: ConfigCommandOptions): Promise<number> {
     const { input, output } = options;
     const targets = options.targets ?? listConfigTargets();
     const readDistroListing = options.listDistros ?? listDistros;

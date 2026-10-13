@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ConfigTarget, McpServerEntry, WslDistroListing } from "@/_types";
-import { runSetupCommand } from "@/modules/manage";
+import { runConfigCommand } from "@/modules/manage";
 import { createJsonFileTarget } from "@/modules/manage/targets/json-file";
 import { listDistros } from "@/modules/wsl";
 
@@ -69,7 +69,7 @@ async function runScript(
 
     input.end(lines.map((line) => `${line}\n`).join(""));
 
-    const exitCode = await runSetupCommand({ input: input, output: output, targets: [target], listDistros: distroLister });
+    const exitCode = await runConfigCommand({ input: input, output: output, targets: [target], listDistros: distroLister });
     return { exitCode: exitCode, screen: screen };
 }
 
@@ -83,7 +83,7 @@ function seedHost(name: string, env: Record<string, string>): void {
     fs.writeFileSync(configPath, JSON.stringify(document, null, 2));
 }
 
-describe("setup — the settings form", () => {
+describe("config — the settings form", () => {
     it("starts on the default distro, so Save alone writes a complete entry", async () => {
         const { exitCode, screen } = await runScript([
             "a",                       // main menu → add
@@ -299,7 +299,7 @@ describe("setup — the settings form", () => {
     });
 });
 
-describe("setup — managing existing entries", () => {
+describe("config — managing existing entries", () => {
     it("lists only this package's servers as the menu, and counts the rest", async () => {
         seedHost("wsl_ubuntu_root", { WSL_DISTRO: "Ubuntu", WSL_USER: "root", WSL_READONLY: "true" });
         seedHost("wsl_ubuntu", { WSL_DISTRO: "Ubuntu" });
@@ -422,14 +422,14 @@ describe("setup — managing existing entries", () => {
             screen += chunk.toString();
         });
 
-        const exitCode = await runSetupCommand({ input: new PassThrough(), output: output, targets: [target], targetId: "vscode" });
+        const exitCode = await runConfigCommand({ input: new PassThrough(), output: output, targets: [target], targetId: "vscode" });
 
         expect(exitCode).toBe(1);
         expect(screen).toContain("Unknown client \"vscode\". One of: cursor");
     });
 });
 
-describe.skipIf(LIVE_ENABLED == false)("setup — against a real distro", () => {
+describe.skipIf(LIVE_ENABLED == false)("config — against a real distro", () => {
     it("lists it from wsl.exe, tests it as the user before saving, and writes the entry", async () => {
         const { screen } = await runScript(
             [

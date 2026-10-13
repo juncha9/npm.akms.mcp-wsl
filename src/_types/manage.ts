@@ -6,7 +6,7 @@ export interface McpServerEntry {
 }
 
 /**
- * What the `setup` form collects for one distro entry. `answersToEntry` turns it into
+ * What the `config` form collects for one distro entry. `answersToEntry` turns it into
  * `WSL_*` variables and `entryToAnswers` reads an existing entry back, so an edit pre-fills.
  */
 export interface HostSetupAnswers {

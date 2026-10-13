@@ -29,7 +29,7 @@ export function profileFromEnv(output: Writable, env: Record<string, string>): W
 
 /**
  * Looks the distro up, runs `id` in it, and reports what happened — the body of `--check`,
- * shared with the `setup` command so a distro that passes setup passes `--check`.
+ * shared with the `config` command so a distro that passes the configuration check passes `--check`.
  *
  * Without this the only way to find out whether the setup works is to ask an agent to try
  * something, which mixes a setup mistake up with a policy rejection.

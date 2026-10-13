@@ -16,7 +16,7 @@ const LISTING_ROW_PATTERN = /^\s*(\*?)\s*(.+?)\s+(Running|Stopped|Installing)\s+
 
 /**
  * Every distro `wsl.exe -l -v` lists. Does not start any of them — that is what makes
- * this safe to call from `wsl_list_hosts`, `--check` and the `setup` form.
+ * this safe to call from `wsl_list_hosts`, `--check` and the `config` form.
  *
  * @throws {Error} If `wsl.exe` cannot be started at all.
  */

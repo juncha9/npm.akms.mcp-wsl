@@ -1,8 +1,9 @@
-# `setup` command — design
+# `config` command — design
 
-Status: **implemented**, 2026-10-11. Ported from `@akms/mcp-ssh`'s `setup` as of its 0.1.3
-(arrow-key lists, settings form, Esc as "back"); this record covers what is shared and what
-differs. `config` — mcp-ssh's name for it before 0.1.3 — is accepted as a hidden alias.
+Status: **implemented**, 2026-10-11. Updated for **0.1.2**, 2026-10-13: `config` is the only configuration command; the former `setup` command exits with code 1 and a reminder to use `config`.
+
+Ported from `@akms/mcp-ssh` 0.1.3's manager (arrow-key lists, settings form, Esc as "back");
+this record covers what is shared and what differs.
 
 ## 🎯 Problem
 
@@ -16,7 +17,7 @@ either — Codex keeps its servers in TOML, Claude Desktop and Cursor in their o
 
 | Question | Decision |
 |---|---|
-| Entry point | `akms-mcp-wsl setup` — a management UI (list / add / edit / remove / check / print / switch client), as in mcp-ssh |
+| Entry point | `akms-mcp-wsl config` — a management UI (list / add / edit / remove / check / print / switch client), as in mcp-ssh |
 | Claude Code scope | **user only** (`~/.claude.json`), as in mcp-ssh |
 | Choosing | arrow-key lists, not typed keywords — mcp-ssh's revision after first use |
 | Add / edit | a settings form, not a question sequence — mcp-ssh's revision: one wrong answer meant walking every question again |
@@ -27,7 +28,7 @@ either — Codex keeps its servers in TOML, Claude Desktop and Cursor in their o
 ## 🧭 Flow
 
 ```
-setup [--target <client>]
+config [--target <client>]
  └─ loop: the entries in the current client's file ARE the menu
      ├─ <entry>          → Edit / Check the distro / Print the entry / Remove / Back
      │    ├─ Edit        the settings form, pre-filled → preview → write;
@@ -108,7 +109,7 @@ see mcp-ssh's record for why.
   that defines this guard.
 - **The check is the server's own startup path.** The built env goes through
   `loadHostProfile(env)` and the report `--check` prints, so a value the server would reject
-  is caught before writing, and a distro that passes setup passes `--check`. It runs `id`,
+  is caught before writing, and a distro that passes the configuration check passes `--check`. It runs `id`,
   which starts a stopped distro — the Test row and the Save prompt say so.
 - **No secrets, no pinning.** Nothing in a WSL entry is secret and nothing connects, so the
   preview is not masked and there is no host key to pin.

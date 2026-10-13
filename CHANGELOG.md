@@ -2,6 +2,19 @@
 
 All notable changes to `@akms/mcp-wsl`. Dates are `YYYY-MM-DD`.
 
+## 0.1.2 — 2026-10-13
+
+### Changed
+
+- **Breaking:** Use `akms-mcp-wsl config` as the only configuration command. The former
+  `setup` command now exits with code 1 and a reminder to use `config`.
+- Align CLI help, usage examples and developer documentation with `config`.
+
+### Verification
+
+- Add CLI regression tests for help, `config --target codex`, rejecting `setup`, and
+  the `--check` guidance when no distro is configured. Tests use temporary client settings.
+
 ## 0.1.1 — 2026-10-13
 
 ### Documentation

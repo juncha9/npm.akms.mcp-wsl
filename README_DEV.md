@@ -9,7 +9,7 @@ Run from Windows PowerShell at the repository root:
 ```powershell
 npm ci                   # install the locked dependencies
 npm run dev -- --check   # tsx, straight from src
-npm run dev -- setup     # the distro manager, against this machine's real client configs
+npm run dev -- config     # the distro manager, against this machine's real client configs
 npm run build            # tsc --noEmit → tsup (esm + cjs + dts into lib/)
 npm test                 # vitest; live cases require MCP_WSL_TEST_DISTRO
 ```
@@ -26,11 +26,11 @@ src/
 ├── modules/
 │   ├── config/  WSL_* readers, profile builder
 │   ├── guard/   the WSL additions over @akms/mcp-ssh's guard
-│   ├── manage/  the `setup` command: prompts, settings form, per-client config writers
+│   ├── manage/  the `config` command: prompts, settings form, per-client config writers
 │   ├── wsl/     wsl.exe process runner, session manager, file operations, distro status
 │   └── tools/   MCP tool registration, output formatting
 ├── server.ts    createWslMcpServer()
-├── cli.ts       bin entry (stdio transport, --check, setup)
+├── cli.ts       bin entry (stdio transport, --check, config)
 └── index.ts     library entry
 ```
 
@@ -72,9 +72,9 @@ The `/mnt` write rule judges the write **target**, not the mention: `cp /mnt/c/a
 
 Each call is its own process, so there is nothing to keep open. A session serializes its calls (the directory is read-modify-write) and adopts the `$PWD` the marker reports, after the same metacharacter check a caller-supplied `cwd` gets.
 
-### `setup` is mcp-ssh's manager with a WSL form
+### `config` is mcp-ssh's manager with a WSL form
 
-`@akms/mcp-ssh` does not export its `setup` machinery, so the client-agnostic half is copied: `prompter.ts` (arrow-key lists and a raw-mode line editor on a TTY, so Esc is seen everywhere; numbered lists off one), `targets/` (Claude Code through `claude mcp`, Codex by TOML section rewrite, plain `mcpServers` JSON files) and the menu loop. Only the macOS / Linux branches were dropped — the package is win32-only, so every entry launches through `cmd /c npx`. A fix to one of those files almost certainly belongs in both packages.
+`@akms/mcp-ssh` does not export its `config` machinery, so the client-agnostic half is copied: `prompter.ts` (arrow-key lists and a raw-mode line editor on a TTY, so Esc is seen everywhere; numbered lists off one), `targets/` (Claude Code through `claude mcp`, Codex by TOML section rewrite, plain `mcpServers` JSON files) and the menu loop. Only the macOS / Linux branches were dropped — the package is win32-only, so every entry launches through `cmd /c npx`. A fix to one of those files almost certainly belongs in both packages.
 
 Written fresh: the settings form (`host-form.ts`) and the entry mapping. There is no connection, so the SSH settings (port, auth, route) and host-key pinning are gone, and so are the rows a choice brings with it — every WSL row is always shown. The distro is picked from `listDistros()` — the `wsl -l -v` rows, matched case-insensitively and written as wsl.exe spells it — and a typed name that is not listed needs an explicit yes. A new entry starts on the default distro, so Save alone writes a complete entry. `WSL_ALLOW_WINDOWS` starts locked, for the reason the server defaults it off.
 
@@ -90,9 +90,10 @@ The check is the server's own path: the entry about to be written goes through `
 | `host-profile.test.ts` | `WSL_*` mapping, defaults, malformed values |
 | `wsl-command.test.ts` | Argument vector (`--exec`), `cd` wrapper, cwd marker |
 | `live-integration.test.ts` | **MCP client ↔ server ↔ real distro** over an in-memory transport: exit codes, argument bytes, UTF-8, closed stdin, bad cwd, session `cd`, timeout, guard rejections proving nothing ran, file round-trips including binary upload/download, unknown distro |
-| `manage-entry.test.ts` | `setup` answers ⇄ entry, carried variables, the `loadHostProfile(env)` contract |
+| `cli-command.test.ts` | CLI help, `config --target`, rejecting `setup`, and unconfigured `--check` guidance |
+| `manage-entry.test.ts` | `config` answers ⇄ entry, carried variables, the `loadHostProfile(env)` contract |
 | `manage-toml.test.ts` | Codex TOML: append, replace keeping hand-added keys, remove, CRLF |
-| `manage-command.test.ts` | **The `setup` UI end to end** — the menu and the settings form over scripted stdin, an injected distro list, a temp JSON config; the failing checks run the real `wsl -l -v` against a name that is not installed |
+| `manage-command.test.ts` | **The `config` UI end to end** — the menu and the settings form over scripted stdin, an injected distro list, a temp JSON config; the failing checks run the real `wsl -l -v` against a name that is not installed |
 | `manage-prompter.test.ts` | Arrow-key lists, the line editor, secret input and Esc as "back" on a simulated TTY; the numbered fallback off one |
 | `manage-cli-shim.test.ts` | Windows only — a JSON payload through npm's `.cmd` shim template, byte for byte |
 
@@ -125,6 +126,9 @@ instance.shutdown();
 `WslHost`, `inspectWslCommand`, `inspectWslPath`, `loadHostProfile` and `registerAllTools` are importable on their own.
 
 ## 📦 Releasing
+
+Version **0.1.2** removes the `setup` command; existing setup invocations must change to
+`config`. The CLI regression suite verifies the transition using temporary client settings.
 
 Keep `package.json`, both root-package versions in `package-lock.json`, and `SERVER_VERSION` in `src/_defs/defaults.ts` in sync. The constant is used by the CLI's `--version` output and the MCP server handshake.
 

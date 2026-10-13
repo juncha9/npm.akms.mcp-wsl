@@ -36,7 +36,7 @@ export const WSL_FAILURE_EXIT_CODES = [4294967295, -1];
 
 export const SERVER_NAME = "akms-mcp-wsl";
 
-/** What `npx -y …` resolves — the `args` the `setup` command writes into every entry. */
+/** What `npx -y …` resolves — the `args` the `config` command writes into every entry. */
 export const PACKAGE_NAME = "@akms/mcp-wsl";
 
-export const SERVER_VERSION = "0.1.1";
+export const SERVER_VERSION = "0.1.2";

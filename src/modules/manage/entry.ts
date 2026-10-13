@@ -29,7 +29,7 @@ const LAUNCH_ARGS = ["/c", "npx", "-y", PACKAGE_NAME];
  */
 export const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,48}$/;
 
-/** True for entries that launch this package — the only ones the `setup` command manages. */
+/** True for entries that launch this package — the only ones the `config` command manages. */
 export function isOurEntry(entry: McpServerEntry): boolean {
     if (entry.args.includes(PACKAGE_NAME) == true) {
         return true;
