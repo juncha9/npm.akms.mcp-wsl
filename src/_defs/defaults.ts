@@ -42,4 +42,4 @@ export const SERVER_NAME = "akms-mcp-wsl";
 /** Package identity used to recognize existing MCP entries. */
 export const PACKAGE_NAME = "@akms/mcp-wsl";
 
-export const SERVER_VERSION = "0.3.0";
+export const SERVER_VERSION = "0.3.1";
