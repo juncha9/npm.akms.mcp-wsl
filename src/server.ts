@@ -7,6 +7,7 @@ import { loadHostProfile } from "@/modules/config";
 import { WslHost, WslSessionManager } from "@/modules/wsl";
 import { registerAllTools } from "@/modules/tools";
 import type { ToolContext } from "@/modules/tools";
+import { createCatalogServer } from "./modules/session-server";
 
 export interface WslMcpServerInstance {
     server: McpServer;
@@ -93,4 +94,27 @@ export function createWslMcpServer(): WslMcpServerInstance {
             sessions.closeAll();
         },
     };
+}
+
+/** Each distro retains a separate host, policy and working-directory session map. */
+export function createWslCatalogServer(file?: string) {
+    const logger = $logger.child({ context: "createWslCatalogServer" });
+    return createCatalogServer<{ host: WslHost; sessions: WslSessionManager }>({
+        kind: "wsl", identity: { name: SERVER_NAME, version: SERVER_VERSION }, file,
+        instructions: SERVER_INSTRUCTIONS.split("\n").slice(3).join("\n"),
+        create(env) {
+            const profile = loadHostProfile(env);
+            if(!profile) throw new Error("No WSL distro is configured for this catalog connection.");
+            const host = new WslHost(profile);
+            const sessions = new WslSessionManager();
+            sessions.startIdleSweeper();
+            return {
+                value: { host, sessions },
+                summary: { description: profile.description, distro: profile.distro, username: profile.username ?? "(distro default)", readonly: profile.policy.readonly },
+                shutdown() { sessions.stopIdleSweeper(); sessions.closeAll(); },
+            };
+        },
+        register: registerAllTools,
+        warn: (name, reason) => logger.warn("catalog connection skipped", { name, reason }),
+    });
 }

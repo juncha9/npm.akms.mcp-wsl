@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import {
     analyzeSegment,
     extractSubstitutions,
@@ -145,7 +147,12 @@ function inspectMountPath(distroPath: string, access: RemotePathAccess): GuardVe
         return { allowed: true };
     }
 
-    const verdict = inspectLocalPath(windowsPath, access);
+    // Keep the new catalog protected even with an older installed SSH guard library.
+    if(/(^|\/)\.akms\/mcp(\/|$)/i.test(windowsPath.replace(/\\/g, "/"))) {
+        return { allowed: false, reason: `AKMS connection credentials and guard configuration are protected (reached through ${distroPath})`, offendingText: distroPath };
+    }
+    const registryDirectory = process.env.AKMS_MCP_HOME ? path.resolve(process.env.AKMS_MCP_HOME) : path.join(os.homedir(), ".akms", "mcp");
+    const verdict = inspectLocalPath(windowsPath, access, ["registry.json", "registry.previous.json"].map(file => path.join(registryDirectory, file)));
     if (verdict.allowed == true) {
         return verdict;
     }

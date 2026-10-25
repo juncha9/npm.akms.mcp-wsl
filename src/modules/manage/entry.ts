@@ -1,3 +1,4 @@
+import { launchCommand, launchKind } from "../registration/runtime";
 import { PACKAGE_NAME, SERVER_NAME, SINGLE_HOST_ENV, TRUTHY_ENV_VALUES } from "@/_defs";
 import type { HostSetupAnswers, McpServerEntry } from "@/_types";
 
@@ -15,13 +16,7 @@ const MANAGED_ENV_NAMES: string[] = [
     SINGLE_HOST_ENV.ALLOWED_PATHS,
 ];
 
-/**
- * How the client launches the server. The package is Windows-only, and there `npx` is a
- * `.cmd` shim that a client spawning without a shell cannot start, so it goes behind
- * `cmd /c` — the wrapper Claude Code's own docs prescribe for npx servers on Windows.
- */
-const LAUNCH_COMMAND = "cmd";
-const LAUNCH_ARGS = ["/c", "npx", "-y", PACKAGE_NAME];
+
 
 /**
  * Valid MCP server names. The name becomes part of every tool name the agent sees
@@ -30,14 +25,7 @@ const LAUNCH_ARGS = ["/c", "npx", "-y", PACKAGE_NAME];
 export const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,48}$/;
 
 /** True for entries that launch this package — the only ones the `config` command manages. */
-export function isOurEntry(entry: McpServerEntry): boolean {
-    if (entry.args.includes(PACKAGE_NAME) == true) {
-        return true;
-    }
-
-    const commandBase = entry.command.replace(/\\/g, "/").split("/").pop() ?? "";
-    return commandBase === SERVER_NAME || commandBase.startsWith(`${SERVER_NAME}.`) == true;
-}
+export function isOurEntry(entry: McpServerEntry): boolean { return launchKind(entry) === "wsl"; }
 
 /**
  * Renders the answers as an entry. A value equal to the server's default is left out, so
@@ -75,9 +63,10 @@ export function answersToEntry(answers: HostSetupAnswers): McpServerEntry {
         env[name] = value;
     }
 
+    const launch = launchCommand("wsl");
     return {
-        command: LAUNCH_COMMAND,
-        args: [...LAUNCH_ARGS],
+        command: launch.command,
+        args: launch.args,
         env: env,
     };
 }

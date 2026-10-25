@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ConfigTarget, McpServerEntry, WslDistroListing } from "@/_types";
-import { runConfigCommand } from "@/modules/manage";
+import { runTargetConfigCommand as runConfigCommand } from "@/modules/manage";
 import { createJsonFileTarget } from "@/modules/manage/targets/json-file";
 import { listDistros } from "@/modules/wsl";
 
@@ -100,11 +100,10 @@ describe("config — the settings form", () => {
         expect(screen).toMatch(/Windows access {2}locked/);
 
         const document = readDocument();
-        expect(document.mcpServers.wsl_ubuntu).toEqual({
-            command: "cmd",
-            args: ["/c", "npx", "-y", "@akms/mcp-wsl"],
+        expect(document.mcpServers.wsl_ubuntu).toMatchObject({
             env: { WSL_DISTRO: "Ubuntu" },
         });
+        expect(document.mcpServers.wsl_ubuntu.args).not.toContain("npx");
         expect(document.theme).toBe("dark");
         expect(document.mcpServers.postgres).toEqual(SEED_DOCUMENT.mcpServers.postgres);
         expect(document.mcpServers["ssh-prod"]).toEqual(SEED_DOCUMENT.mcpServers["ssh-prod"]);

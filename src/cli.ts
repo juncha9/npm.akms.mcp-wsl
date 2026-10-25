@@ -5,7 +5,7 @@ import { LOG_LEVEL_ENV, SERVER_NAME, SERVER_VERSION, SHUTDOWN_DEADLINE_MS, SINGL
 import { $logger } from "@/_libs";
 import type { WslHostProfile } from "@/_types";
 import { runDistroCheck, runConfigCommand } from "@/modules/manage";
-import { createWslMcpServer } from "@/server";
+import { createWslCatalogServer, createWslMcpServer } from "@/server";
 
 /** `@akms/mcp-ssh`'s guard logs through its own logger; keep the two thresholds aligned. */
 const SSH_LOG_LEVEL_ENV = "SSH_MCP_LOG_LEVEL";
@@ -14,23 +14,27 @@ interface CliArguments {
     showHelp: boolean;
     showVersion: boolean;
     checkOnly: boolean;
+    catalogMode: boolean;
     /** `config` as the first argument opens the distro manager instead of the server. */
     configMode: boolean;
+    managementMode?: "config" | "register" | "sync";
     /** `--target <id>` — the client `config` opens on. */
     targetId?: string;
 }
 
 function parseArguments(argv: string[]): CliArguments {
-    const parsed: CliArguments = { showHelp: false, showVersion: false, checkOnly: false, configMode: false };
+    const parsed: CliArguments = { showHelp: false, showVersion: false, checkOnly: false, configMode: false, catalogMode: false };
 
     let rest = argv;
-    if (argv[0] === "config") {
+    if(["config", "register", "sync"].includes(argv[0])) {
         parsed.configMode = true;
+        parsed.managementMode = argv[0] as "config" | "register" | "sync";
         rest = argv.slice(1);
     }
 
     for (let index = 0; index < rest.length; index += 1) {
         const argument = rest[index];
+        if(argument === "--catalog") { parsed.catalogMode = true; continue; }
 
         if (argument === "--target") {
             parsed.targetId = rest[index + 1];
@@ -59,6 +63,7 @@ function parseArguments(argv: string[]): CliArguments {
         }
     }
 
+    if(parsed.catalogMode && (parsed.checkOnly || parsed.configMode || parsed.targetId !== undefined)) throw new Error("--catalog cannot be combined with --check, management commands or --target.");
     return parsed;
 }
 
@@ -67,17 +72,20 @@ const HELP_TEXT = [
     "",
     "Usage:",
     "  akms-mcp-wsl [--check]",
+    "  akms-mcp-wsl --catalog           Load WSL connections from the shared registry",
     "  akms-mcp-wsl config [--target <client>]",
+    "  akms-mcp-wsl register          Register AI services for all AKMS connections",
+    "  akms-mcp-wsl sync              Review differences and retry pending changes",
     "",
     "Commands:",
-    "  config               Manage the WSL distros registered in an MCP client's config —",
+    "  config               Manage the WSL distros in the shared AKMS catalog —",
     "                       list, add, edit, remove, check, print. Asks plain questions,",
     "                       so the WSL_* names below never have to be typed.",
     "",
     "Options:",
     "      --check          Look up the configured distro, run 'id' in it, report the result, and exit.",
     "      --target <id>    config: claude-code | codex | claude-desktop | cursor",
-    "                       (default: the first one installed)",
+    "                       (preselects a service in Register; saves apply to all registered services)",
     "  -v, --version        Print the version and exit",
     "  -h, --help           Print this help and exit",
     "",
@@ -97,6 +105,7 @@ const HELP_TEXT = [
     `  ${LOG_LEVEL_ENV}  silent | debug | info | warn | error  (default: info, written to stderr)`,
     "",
     "Windows only — wsl.exe is the transport. The server speaks MCP over stdio; run it from an MCP client, not interactively.",
+    "Catalog: ~/.akms/mcp/registry.json (or $AKMS_MCP_HOME/registry.json) stores settings and passwords in plaintext.",
 ].join("\n");
 
 /**
@@ -159,11 +168,12 @@ async function main(): Promise<void> {
             input: process.stdin,
             output: process.stdout,
             targetId: cliArguments.targetId,
+            mode: cliArguments.managementMode,
         });
         process.exit(exitCode);
     }
 
-    const instance = createWslMcpServer();
+    const instance = cliArguments.catalogMode ? createWslCatalogServer() : createWslMcpServer();
 
     if (cliArguments.checkOnly == true) {
         const exitCode = await runCheckCommand(instance.profile);
@@ -195,10 +205,9 @@ async function main(): Promise<void> {
             _logger.warn("shutdown did not finish in time; exiting anyway", { deadline_ms: SHUTDOWN_DEADLINE_MS });
             process.exit(0);
         }, SHUTDOWN_DEADLINE_MS).unref();
-        instance.shutdown();
-        void instance.server.close().finally(() => {
-            process.exit(0);
-        });
+        void Promise.resolve(instance.shutdown()).catch((error) => {
+            _logger.error(error, "shutdown failed");
+        }).finally(() => instance.server.close().finally(() => { process.exit(0); }));
     };
 
     process.on("SIGINT", () => {
@@ -222,6 +231,7 @@ async function main(): Promise<void> {
         version: SERVER_VERSION,
         profile: instance.profile?.name ?? null,
         pid: process.pid,
+        ...("connectionCount" in instance ? { connections: instance.connectionCount } : {}),
     });
 }
 

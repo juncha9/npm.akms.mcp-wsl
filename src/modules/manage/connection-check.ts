@@ -4,6 +4,7 @@ import type { WslDistroStatus, WslHostProfile } from "@/_types";
 import { loadHostProfile } from "@/modules/config";
 import { formatDistroStatus } from "@/modules/tools";
 import { WslHost, probeDistroFacts, queryDistroListing } from "@/modules/wsl";
+import { CheckProgress } from "./check-progress";
 
 /**
  * Builds a profile from an entry's env the way the server will at startup — so a value the
@@ -40,11 +41,14 @@ export async function runDistroCheck(profile: WslHostProfile, output: Writable):
     const endpoint = `${profile.username ?? "(distro default)"}@${profile.distro}`;
     output.write(`Checking ${profile.name}  →  ${endpoint}\n\n`);
 
+    const progress = new CheckProgress(output);
     let listing: WslDistroStatus;
     try {
+        progress.start("Finding WSL distribution");
         listing = await queryDistroListing(profile.distro);
     }
     catch (ex) {
+        progress.finish(false);
         let detail = String(ex);
         if (ex instanceof Error) {
             detail = ex.message;
@@ -54,6 +58,7 @@ export async function runDistroCheck(profile: WslHostProfile, output: Writable):
     }
 
     if (listing.installed == false) {
+        progress.finish(false);
         output.write(`  FAILED  ${formatDistroStatus(listing)}\n`);
         return false;
     }
@@ -62,6 +67,7 @@ export async function runDistroCheck(profile: WslHostProfile, output: Writable):
     const startedAt = Date.now();
 
     try {
+        progress.start("Starting distribution and checking user");
         const probe = await host.exec({
             command: "id",
             timeoutMs: profile.policy.execTimeoutMs,
@@ -71,21 +77,28 @@ export async function runDistroCheck(profile: WslHostProfile, output: Writable):
         const durationMs = Date.now() - startedAt;
 
         if (probe.exitCode !== 0) {
+            progress.finish(false);
             output.write(`  FAILED  ${endpoint}  exit code ${probe.exitCode}\n          ${probe.stderr.trim()}\n`);
             return false;
         }
 
+        progress.start("Reading distribution information");
         const facts = await probeDistroFacts(host);
+        progress.finish(true);
         output.write(`  OK      ${probe.stdout.trim()}  (${durationMs}ms)\n`);
         output.write(`          ${formatDistroStatus({ ...listing, ...facts })}\n`);
         return true;
     }
     catch (ex) {
+        progress.finish(false);
         let detail = String(ex);
         if (ex instanceof Error) {
             detail = ex.message;
         }
         output.write(`  FAILED  ${endpoint}\n          ${detail}\n`);
         return false;
+    }
+    finally {
+        progress.stop();
     }
 }

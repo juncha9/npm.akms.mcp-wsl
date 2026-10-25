@@ -1,4 +1,4 @@
-export { createWslMcpServer } from "./server";
+export { createWslMcpServer, createWslCatalogServer } from "./server";
 export type { WslMcpServerInstance } from "./server";
 
 export { loadHostProfile, toHostSummary } from "./modules/config";

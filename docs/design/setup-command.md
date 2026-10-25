@@ -1,5 +1,9 @@
 # `config` command — design
 
+## Shared registration update
+
+`config` now manages a shared user catalog and applies changes to all services selected in `register`. Each package independently provides `register`, `config` and `sync`; the optional `akms-mcp` helper is not a dependency. The earlier Switch/Copy menus below describe the original target-specific manager, which remains an internal form adapter. Common registration code is bundled from `src/modules/registration`.
+
 Status: **implemented**, 2026-10-11. Updated for **0.1.2**, 2026-10-13: `config` is the only configuration command; the former `setup` command exits with code 1 and a reminder to use `config`.
 
 Ported from `@akms/mcp-ssh` 0.1.3's manager (arrow-key lists, settings form, Esc as "back");
@@ -8,7 +12,7 @@ this record covers what is shared and what differs.
 ## 🎯 Problem
 
 Registering a distro means writing an MCP server entry by hand: the right file for the
-right client, the `command` / `args` shape (`cmd /c npx` on Windows), and `WSL_*` names
+right client, the direct Node `command` / `args` paths, and `WSL_*` names
 nobody remembers. A distro name typed as `ubuntu` when `wsl -l -q` says `Ubuntu-24.04` is
 only discovered when the agent's first call fails. The client is not always Claude Code
 either — Codex keeps its servers in TOML, Claude Desktop and Cursor in their own JSON files.
@@ -113,7 +117,11 @@ see mcp-ssh's record for why.
   which starts a stopped distro — the Test row and the Save prompt say so.
 - **No secrets, no pinning.** Nothing in a WSL entry is secret and nothing connects, so the
   preview is not masked and there is no host key to pin.
-- **Entries launch through `cmd /c npx -y @akms/mcp-wsl`** — the package is win32-only.
+- **Entries start Node directly** with the package's `lib/cli.js` under
+  `<AKMS_MCP_HOME or ~/.akms/mcp>/runtime`. Add/Edit install a missing runtime and
+  offer updates for older versions. Runtime provides
+  explicit updates and reviewed conversion of old npx entries; clients must
+  reconnect after conversion. The package remains win32-only.
 
 ## 🗂️ Targets
 

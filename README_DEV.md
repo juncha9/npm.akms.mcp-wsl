@@ -1,5 +1,20 @@
 # Development
 
+## Release guard and package order
+
+Run `npm run prepublishOnly` to inspect every publish prerequisite without publishing. `npm publish` runs the same `node scripts/release-guard.mjs` gate. It requires a clean `git status --porcelain`, a package version newer than the configured registry's `latest`, matching `SERVER_VERSION` (servers only), and five registration copies matching the DB baseline. Metadata uses a fresh temporary cache. Any lookup failure, including E404, or a missing `latest` tag blocks release. All five sibling checkouts are needed for release comparison; normal builds and installed packages do not need them.
+
+The DB registration directory is the baseline. Run `node scripts/sync-registration.mjs` from the DB checkout after common changes. The launcher keeps its own adapters and its `prompter.ts` import is adjusted for `launcher/prompter`. Keep the five development-only `scripts/release-guard.mjs` copies identical.
+
+Release in this order:
+
+1. Publish `@akms/mcp-ssh` with AKMS registry protection first, after its tests, build, package inspection, reviewed commit and release gate pass.
+2. Raise `@akms/mcp-wsl`'s SSH dependency minimum to that published protected release, remove ranges permitting SSH 0.1.9, and refresh its lockfile and local dependency. WSL's release gate calls the installed SSH guard against `.akms/mcp` reads and writes; the current SSH 0.1.9 must fail, regardless of the WSL version.
+3. Validate and publish WSL, then the DB and S3 servers. Align each manifest, lockfile and `SERVER_VERSION`, synchronize registration, and commit reviewed release changes before running the gate.
+4. Publish the optional `@akms/mcp` launcher last, once every child can be installed from npm.
+
+The guard never commits, installs dependencies or publishes. `npm pack --dry-run` inspects contents without invoking this publish-only gate.
+
 Sibling of [`@akms/mcp-ssh`](https://github.com/alkemic-studio/npm.akms.mcp-ssh) — same layout, same build, same tool surface with `ssh_` → `wsl_`. The design record with the measurements behind each decision is `akms.docs/mcp-wsl-design.md`.
 
 ## 🧑‍💻 Commands
@@ -42,7 +57,9 @@ Reused as a dependency: `inspectCommand`, `inspectRemotePath`, `inspectLocalPath
 
 Re-implemented: the `cd` wrapper and `$PWD` marker (not exported by mcp-ssh), the logger (its own env var), the text helpers. Written fresh: everything that touched ssh2.
 
-Importing `@akms/mcp-ssh` loads `ssh2` as a side effect of its barrel. It is never used; it is the cost of not extracting a `@akms/mcp-guard` package yet.
+Since WSL 0.1.6, the dependency requires `@akms/mcp-ssh` >=0.1.9; WSL 0.2.0 accepts `^0.1.9 || ^0.2.0`. The lockfile keeps the verified, published 0.1.9 release so clean installs work before SSH 0.2.0 is published. That package loads `ssh2` only when an SSH connection is opened, so reusing its guards no longer initializes the SSH/crypto runtime. The guard implementation stays shared. `tests/startup-loading.test.ts` checks a fresh process before and after guard checks and command execution, substituting a Node process for `wsl.exe` so the test never starts a distro.
+
+On Windows with Node 24.19.0, three fresh built-library processes per version measured median Private Bytes of 47.92 → 44.88 MiB and RSS of 79.74 → 73.21 MiB after constructing a configured server. The comparison used SSH dependency 0.0.2 versus 0.1.9, with no WSL commands or npm wrapper. These are local startup samples, not a fixed memory budget or a measurement of WSL VM memory. The `ssh2` module was loaded in every old sample and absent in every new sample.
 
 ### `--exec`, measured
 
@@ -74,7 +91,7 @@ Each call is its own process, so there is nothing to keep open. A session serial
 
 ### `config` is mcp-ssh's manager with a WSL form
 
-`@akms/mcp-ssh` does not export its `config` machinery, so the client-agnostic half is copied: `prompter.ts` (arrow-key lists and a raw-mode line editor on a TTY, so Esc is seen everywhere; numbered lists off one), `targets/` (Claude Code through `claude mcp`, Codex by TOML section rewrite, plain `mcpServers` JSON files) and the menu loop. Only the macOS / Linux branches were dropped — the package is win32-only, so every entry launches through `cmd /c npx`. A fix to one of those files almost certainly belongs in both packages.
+`@akms/mcp-ssh` does not export its `config` machinery, so the client-agnostic half is copied: `prompter.ts` (arrow-key lists and a raw-mode line editor on a TTY, so Esc is seen everywhere; numbered lists off one), `targets/` (Claude Code through `claude mcp`, Codex by TOML section rewrite, plain `mcpServers` JSON files) and the menu loop. The package is win32-only; managed entries start Node directly using the dedicated AKMS runtime installation. A fix to one of those files almost certainly belongs in both packages.
 
 Written fresh: the settings form (`host-form.ts`) and the entry mapping. There is no connection, so the SSH settings (port, auth, route) and host-key pinning are gone, and so are the rows a choice brings with it — every WSL row is always shown. The distro is picked from `listDistros()` — the `wsl -l -v` rows, matched case-insensitively and written as wsl.exe spells it — and a typed name that is not listed needs an explicit yes. A new entry starts on the default distro, so Save alone writes a complete entry. `WSL_ALLOW_WINDOWS` starts locked, for the reason the server defaults it off.
 
@@ -156,4 +173,33 @@ node ./lib/cli.js --version
 npm pack --dry-run
 ```
 
-Check that the CLI prints the release version and the package preview contains the built `lib/` files, `README.md` and `LICENSE.md`. After reviewing the changes and package contents, publish with `npm publish`.
+Check that the CLI prints the release version and the package preview contains the built `lib/` files, `README.md`, `CHANGELOG.md` and `LICENSE.md`. After reviewing the changes and package contents, publish with `npm publish`.
+
+Before releasing the catalog guard changes, publish the `@akms/mcp-ssh` version that includes them, then raise WSL's dependency minimum to that version and refresh its lockfile. The currently locked SSH 0.1.9 does not protect the AKMS catalog in WSL's local upload/download handlers.
+
+## Registration code
+
+The local `src/modules/registration` copy is bundled into this package. It needs no launcher or sibling checkout at build or runtime. The sibling DB checkout maintains the shared files; its `node scripts/sync-registration.mjs` command updates development copies. Keep schema version 1 compatible across releases and test standalone registration before publishing.
+
+## Link the development runtime
+
+The server installation is independent of the active Node version: `<AKMS_MCP_HOME or ~/.akms/mcp>/runtime`. After building the checkout, use npm's global layout with this explicit prefix; a plain `npm link` in the default Node prefix is not discovered as the managed runtime.
+
+From this checkout in PowerShell:
+
+```powershell
+npm run build
+$akmsRuntime = if ($env:AKMS_MCP_HOME) { Join-Path $env:AKMS_MCP_HOME "runtime" } else { Join-Path $env:USERPROFILE ".akms/mcp/runtime" }
+npm install --global --prefix $akmsRuntime .
+node lib/cli.js config
+```
+
+For macOS/Linux, use `npm install --global --prefix "${AKMS_MCP_HOME:-$HOME/.akms/mcp}/runtime" "$PWD"` after building (WSL server execution still requires Windows). The package is linked into the prefix without moving the source checkout. Runtime shows **linked development checkout**, hides Update and skips version-update prompts. Rebuild the source to change the running code, then reconnect AI clients. Use Runtime > Use for existing connections to migrate older npm/npx launch paths.
+
+## Session-server compatibility
+
+Setup reads registry versions 1 and 2. New catalogs start at version 2 with `defaultMode: "catalog"`; their first connection of each kind creates its session launch. Existing version 1 catalogs require the confirmed Runtime switch. Existing version 2 catalogs without `defaultMode` retain individual mode for kinds without explicit session state. Per-kind choices override the default, and rollback keeps version 2 so older setup cannot recreate individual entries. Server `--catalog` readers accept both versions without locks or writes. The common `catalog.ts` has no dependency on setup or the optional helper. Include it in the five-copy release comparison. `registration-session.test.ts` covers migration/rollback, backup failure, name budgets, external edits, replacement ordering and bundle startup coverage.
+
+During active MCP development, build a disposable source copy and validate it before replacing live `lib` files. The normal build removes `lib`; running it beneath a connected MCP can break active sessions.
+
+Registry migrations are ordered in `registry.ts`: `v1_to_v2`, then `catalog_default`. `needsMigration`, `planMigration`, and `applyMigration` support scripted review/application; the plan is rechecked under the normal lock. Session planning and state transitions are shared with `planSession`/`applySession`, while one outer mutation preserves the pre-migration backup. `setDefaultMode("individual")` and `setDefaultMode("catalog")` change only the future-kind default after migration. An explicit individual marker remains current format. `registration-migration.test.ts` covers migration, no-op repetition, backup, stale plans, external edits, missing runtimes, rollback preservation and menu approval. Include `migration-menu.ts` in common-file synchronization.

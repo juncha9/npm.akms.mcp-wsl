@@ -115,6 +115,7 @@ describe("inspectWslCommand — drive mounts", () => {
     it.each([
         "cat /mnt/c/Users/me/.ssh/id_ed25519",
         "cat /mnt/c/Users/me/.claude.json",
+        "cat /mnt/c/Users/me/.akms/mcp/registry.json",
         "cp /mnt/c/Users/me/.aws/credentials /tmp/",
         "cat '/mnt/c/Users/me/.claude/settings.json'",
         "cat '/mnt/c/Users/Jun Cha/.ssh/id_rsa'",

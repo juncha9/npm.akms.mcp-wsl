@@ -1,6 +1,6 @@
 {
     "name": "@akms/mcp-wsl",
-    "version": "0.1.3",
+    "version": "0.2.1",
     "description": "MCP server that lets an AI agent run shell commands and transfer files in one pre-registered WSL distro through wsl.exe — no sshd, no key, no port — with every command and path screened by the @akms/mcp-ssh guard policy.",
     "keywords": [],
     "license": "MIT",
@@ -34,6 +34,7 @@
     "files": [
         "lib",
         "README.md",
+        "CHANGELOG.md",
         "LICENSE.md"
     ],
     "engines": {
@@ -46,6 +47,7 @@
         "access": "public"
     },
     "scripts": {
+        "prepublishOnly": "node scripts/release-guard.mjs",
         "build": "tsc --noEmit && rimraf ./lib && tsup",
         "watch": "tsc --noEmit && tsup --watch",
         "dev": "tsx ./src/cli.ts",
@@ -55,8 +57,9 @@
         "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@akms/mcp-ssh": "^0.0.2",
+        "@akms/mcp-ssh": "^0.1.9 || ^0.2.0",
         "@modelcontextprotocol/sdk": "^1.30.0",
+        "smol-toml": "1.9.1",
         "zod": "^4.4.3"
     },
     "devDependencies": {

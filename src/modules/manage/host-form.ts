@@ -248,17 +248,19 @@ function nextCursor(state: FormState, destination: string, edited: FieldId): For
  *
  * @returns True when the distro answered.
  */
-async function testDistro(output: Writable, state: FormState): Promise<boolean> {
+async function testDistro(prompter: Prompter, output: Writable, state: FormState): Promise<boolean> {
     output.write("\n");
     const profile = profileFromEnv(output, answersToEntry(state.answers).env);
     if (profile == null) {
         output.write("\n");
         state.lastTest = "failed";
+        await prompter.pause();
         return false;
     }
 
     const answered = await runDistroCheck(profile, output);
     output.write("\n");
+    await prompter.pause();
 
     if (answered == true) {
         state.lastTest = "ok";
@@ -431,7 +433,7 @@ export async function runHostForm(prompter: Prompter, output: Writable, options:
                         continue;
                     }
 
-                    const answered = await testDistro(output, state);
+                    const answered = await testDistro(prompter, output, state);
                     cursor = "test";
                     if (answered == true) {
                         cursor = "save";
@@ -459,7 +461,7 @@ export async function runHostForm(prompter: Prompter, output: Writable, options:
                     if (snapshotOf(state) !== state.testedSnapshot) {
                         const testFirst = await prompter.askYesNo("Test the distro before saving? (starts it if it is stopped)", true);
                         if (testFirst == true) {
-                            const answered = await testDistro(output, state);
+                            const answered = await testDistro(prompter, output, state);
                             if (answered == false) {
                                 const next = await prompter.select(
                                     "The check failed. What now?",

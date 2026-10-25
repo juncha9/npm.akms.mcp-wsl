@@ -25,11 +25,16 @@ describe("answersToEntry — what gets written", () => {
         expect(entry.env).toEqual({ WSL_DISTRO: "Ubuntu" });
     });
 
-    it("launches the package through npx behind cmd /c", () => {
+    it("creates a direct installed launch without npx", () => {
         const entry = answersToEntry(createAnswers());
-
-        expect(entry.command).toBe("cmd");
-        expect(entry.args).toEqual(["/c", "npx", "-y", "@akms/mcp-wsl"]);
+        expect(entry.command).not.toBe("npx");
+        expect(entry.command).not.toBe("cmd");
+        expect(entry.args).not.toContain("npx");
+        expect(isOurEntry(entry)).toBe(true);
+        if(entry.args.length) {
+            expect(entry.command).toBe(process.execPath);
+            expect(entry.args[0].replace(/\\/g, "/")).toMatch(/node_modules\/@akms\/mcp-wsl\/lib\/cli\.js$/);
+        } else expect(entry.command).toBe("akms-mcp-wsl");
     });
 
     it("writes every answered setting under its variable", () => {
