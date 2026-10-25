@@ -108,7 +108,7 @@ On POSIX, new catalog files request mode `0600` and new catalog directories `070
 
 Keep both catalog files private: do not commit it, share it, copy it to another person or PC, paste its contents into chats/issues/AI conversations, or ask an AI agent to print it. Exclude it from cloud sync and shared backups, or protect those copies. Prefer SSH key authentication over passwords where possible. If exposed, change the affected passwords or rotate the affected keys/tokens, then update the connections through `config`.
 
-SSH blocks local uploads from and downloads into `.akms/mcp`. A custom `AKMS_MCP_HOME` outside that path is not protected as a whole: its `registry.json` and `registry.previous.json` are additionally blocked when the SSH process has that environment variable. Remote SSH paths have no catalog-specific block. WSL protects these paths through `/mnt/<drive>/`; native Linux paths have no catalog-specific block, and local Windows transfers depend on the installed SSH guard. The locked SSH 0.1.9 dependency does not block the catalog in those local transfers. Do not rely on these guards to keep the file private.
+SSH blocks local uploads from and downloads into `.akms/mcp`. A custom `AKMS_MCP_HOME` outside that path is not protected as a whole: its `registry.json` and `registry.previous.json` are additionally blocked when the SSH process has that environment variable. Remote SSH paths have no catalog-specific block. WSL protects these paths through `/mnt/<drive>/`; native Linux paths have no catalog-specific block. WSL's local Windows uploads and downloads use the guard from its `@akms/mcp-ssh` ^0.3.1 dependency and block the same local catalog paths. Do not rely on these guards to keep the file private.
 
 Each successful catalog-changing operation atomically keeps one previous revision as **`registry.previous.json`** in the same directory. Internal application bookkeeping does not replace that pre-operation revision, and a no-op Sync leaves it unchanged. The copy requests the catalog's existing file permissions; Windows uses inherited ACLs. This is one revision, not a history.
 
@@ -269,7 +269,7 @@ Both `wsl_exec` and the file tools enforce these; the rules live in the layer ev
 
 ## Memory and process lifetime
 
-The server reuses command and path guards from `@akms/mcp-ssh` >=0.1.9 without loading its SSH/crypto runtime. A WSL command still runs through `wsl.exe`; no SSH connection or parser worker is involved.
+The server reuses command and path guards from `@akms/mcp-ssh` ^0.3.1 without loading its SSH/crypto runtime. A WSL command still runs through `wsl.exe`; no SSH connection or parser worker is involved.
 
 Command output is bounded, and upload/download bodies stream through pipes. Sessions retain working-directory state, not a persistent shell or command history; unused sessions expire after 15 minutes, with active operations skipped by the sweeper. These limits do not force Node's RSS back to its startup value after use.
 

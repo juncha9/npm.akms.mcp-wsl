@@ -2,11 +2,15 @@
 
 All notable changes to `@akms/mcp-wsl`. Dates are `YYYY-MM-DD`.
 
-## Unreleased
+## [0.3.1] - 2026-10-26
+
+### Changed
+
+- Require `@akms/mcp-ssh` ^0.3.1. Its local transfer guard blocks the AKMS catalog (`registry.json`, `registry.previous.json`) in `wsl_upload` and `wsl_download`; the earlier 0.1.9 dependency did not.
 
 ### Verification
 
-- Stabilize Windows test cleanup: temporary test directories are removed with one bounded asynchronous retry budget for transient file locks, while persistent errors still fail. Tests only; the published package changes only its version.
+- Stabilize Windows test cleanup: temporary test directories are removed with one bounded asynchronous retry budget for transient file locks, while persistent errors still fail. Tests only.
 - 0.3.0 was committed but never published to npm; 0.3.1 is the first published 0.3 release.
 
 ## [0.3.0] - 2026-10-26

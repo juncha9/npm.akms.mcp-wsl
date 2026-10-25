@@ -11,17 +11,19 @@ vi.mock("../src/modules/wsl", async (original) => ({ ...await original<typeof im
 afterEach(() => { vi.unstubAllEnvs(); transfer.mockClear(); });
 
 describe("catalog transfer security evidence with the installed SSH guard", () => {
-    it.each(["wsl_upload", "wsl_download"])("documents that the locked SSH 0.1.9 guard does not block local catalog paths in %s", async (name) => {
+    it.each(["wsl_upload", "wsl_download"])("blocks local catalog paths in %s with the required SSH ^0.3.1 guard", async (name) => {
         vi.stubEnv("WSL_MCP_LOG_LEVEL", "silent");
         const handlers = new Map<string, (args: unknown) => Promise<{ isError?: boolean }>>();
         registerFileTools({ registerTool: (name: string, _options: unknown, handler: (args: unknown) => Promise<{ isError?: boolean }>) => handlers.set(name, handler) } as unknown as McpServer,
             { host: { profile: createProfile() }, sessions: {} } as ToolContext);
         for(const home of [path.resolve("fixture", ".akms", "mcp"), path.resolve("fixture", "custom-catalog")]) {
             vi.stubEnv("AKMS_MCP_HOME", home);
-            const result = await handlers.get(name)!({ localPath: path.join(home, "registry.json"), remotePath: "/tmp/fixture" });
-            expect(result.isError).not.toBe(true);
+            for(const file of ["registry.json", "registry.previous.json"]) {
+                const result = await handlers.get(name)!({ localPath: path.join(home, file), remotePath: "/tmp/fixture" });
+                expect(result.isError).toBe(true);
+            }
         }
-        expect(transfer).toHaveBeenCalledTimes(2);
+        expect(transfer).not.toHaveBeenCalled();
     });
 
     it.each(["read", "write"] as const)("blocks default catalog paths through Windows mounts for %s, but not native Linux paths", (access) => {

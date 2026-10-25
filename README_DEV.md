@@ -57,7 +57,7 @@ Reused as a dependency: `inspectCommand`, `inspectRemotePath`, `inspectLocalPath
 
 Re-implemented: the `cd` wrapper and `$PWD` marker (not exported by mcp-ssh), the logger (its own env var), the text helpers. Written fresh: everything that touched ssh2.
 
-Since WSL 0.1.6, the dependency requires `@akms/mcp-ssh` >=0.1.9; WSL 0.2.0 accepts `^0.1.9 || ^0.2.0`. The lockfile keeps the verified, published 0.1.9 release so clean installs work before SSH 0.2.0 is published. That package loads `ssh2` only when an SSH connection is opened, so reusing its guards no longer initializes the SSH/crypto runtime. The guard implementation stays shared. `tests/startup-loading.test.ts` checks a fresh process before and after guard checks and command execution, substituting a Node process for `wsl.exe` so the test never starts a distro.
+Since WSL 0.3.1, the dependency requires `@akms/mcp-ssh` ^0.3.1, the first release whose local transfer guard blocks the AKMS catalog; the lockfile pins the published 0.3.1. WSL 0.1.6–0.2.x accepted SSH >=0.1.9. That package loads `ssh2` only when an SSH connection is opened, so reusing its guards no longer initializes the SSH/crypto runtime. The guard implementation stays shared. `tests/startup-loading.test.ts` checks a fresh process before and after guard checks and command execution, substituting a Node process for `wsl.exe` so the test never starts a distro.
 
 On Windows with Node 24.19.0, three fresh built-library processes per version measured median Private Bytes of 47.92 → 44.88 MiB and RSS of 79.74 → 73.21 MiB after constructing a configured server. The comparison used SSH dependency 0.0.2 versus 0.1.9, with no WSL commands or npm wrapper. These are local startup samples, not a fixed memory budget or a measurement of WSL VM memory. The `ssh2` module was loaded in every old sample and absent in every new sample.
 
@@ -175,7 +175,7 @@ npm pack --dry-run
 
 Check that the CLI prints the release version and the package preview contains the built `lib/` files, `README.md`, `CHANGELOG.md` and `LICENSE.md`. After reviewing the changes and package contents, publish with `npm publish`.
 
-Before releasing the catalog guard changes, publish the `@akms/mcp-ssh` version that includes them, then raise WSL's dependency minimum to that version and refresh its lockfile. The currently locked SSH 0.1.9 does not protect the AKMS catalog in WSL's local upload/download handlers.
+When an SSH guard change matters to WSL, publish that `@akms/mcp-ssh` version first, then raise WSL's dependency minimum to it and refresh the lockfile. 0.3.1 did this for the catalog guard (`^0.3.1`).
 
 ## Registration code
 
